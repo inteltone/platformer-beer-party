@@ -1,0 +1,12 @@
+{
+  "name": "beer-platformer",
+  "version": "0.1.0",
+  "description": "Пивной платформер — прыжки по плавающим кегам (Phaser 3)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  }
+}
