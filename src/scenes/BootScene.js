@@ -8,8 +8,10 @@ class BootScene extends Phaser.Scene {
     this.load.image('player', 'assets/player.png');
     this.load.image('brick', 'assets/texture-brick.png');
     this.load.image('bgtexture', 'assets/texture-bg.png');
+    this.load.image('truby', 'assets/truby.png');
     this.load.image('nameplate', 'assets/nameplate.png');
     this.load.image('header', 'assets/header.png');
+    this.load.image('plashka', 'assets/plashka.png');
   }
 
   create() {
@@ -28,6 +30,11 @@ function createPlaceholderTextures(scene) {
   g.fillStyle(0xffffff, 1);
   g.fillRect(0, 0, 2, 2);
   g.generateTexture('pixel', 2, 2);
+  g.clear();
+
+  g.fillStyle(0xffffff, 1);
+  g.fillCircle(8, 8, 8);
+  g.generateTexture('circle', 16, 16);
   g.clear();
 
   g.fillStyle(CONFIG.DOCK.color, 1);

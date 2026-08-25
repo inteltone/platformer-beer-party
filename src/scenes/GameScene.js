@@ -18,10 +18,16 @@ class GameScene extends Phaser.Scene {
     this.groundedKeg = null;
     this.lastKeg = null;
     this.fallenFromKeg = null;
+    this.fallMessageIndex = 0;
+    this.levelCfg = CONFIG.LEVELS[CONFIG.GAME.level - 1] || CONFIG.LEVELS[0];
 
     this.physics.world.setBounds(0, 0, G.worldWidth, G.height);
 
     this.add.tileSprite(G.worldWidth / 2, G.height / 2, G.worldWidth, G.height, 'bgtexture').setDepth(-0.5);
+
+    if (this.textures.exists('truby')) {
+      this.add.image(G.worldWidth / 2, G.height / 2, 'truby').setDepth(0);
+    }
 
     if (this.textures.exists('header')) {
       const hH = this.textures.get('header').get(0).height;
@@ -46,38 +52,75 @@ class GameScene extends Phaser.Scene {
     this.rescueKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
-    this.hudText = this.add.text(G.width / 2, 14, '', {
-      fontFamily: 'Arial',
-      fontSize: '18px',
+    const mono = 'Courier New, monospace';
+
+    this.levelText = this.add.text(308, 25.5, '1', {
+      fontFamily: mono,
+      fontSize: '32px',
       fontStyle: 'bold',
-      color: CONFIG.HUD.color
-    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(10);
-    this.updateHUD();
+      color: '#ffffff'
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31);
 
-    this.add.text(G.width / 2, 42, '← → движение, ↑ прыжок', {
+    this.pointsText = this.add.text(453.5, 34, '0', {
+      fontFamily: mono,
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#00ff42'
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31);
+
+    this.rescuesText = this.add.text(590.5, 34, '0', {
+      fontFamily: mono,
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#00ff42'
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31);
+
+    this.fallsText = this.add.text(713, 34, '0', {
+      fontFamily: mono,
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#ff0000'
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31);
+
+    this.timerText = this.add.text(1184, 35, '00:60', {
+      fontFamily: mono,
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#00ff42'
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31);
+
+    this.timeUp = false;
+    this.timeUpText = this.add.text(G.width / 2, G.height * 0.35, 'Время истекло', {
       fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#555555'
-    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(10);
+      fontSize: '52px',
+      fontStyle: 'bold',
+      color: '#ff0000',
+      backgroundColor: 'rgba(0,0,0,0.75)',
+      padding: { x: 32, y: 18 }
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(25).setVisible(false);
 
-    this.splashEmitter = this.add.particles(0, 0, 'pixel', {
+    this.timerEnd = this.time.now + this.levelCfg.time * 1000;
+    this.updateHUD();
+    this.updateTimerText();
+
+    this.splashEmitter = this.add.particles(0, 0, 'circle', {
       speed: { min: 80, max: 220 },
       angle: { min: 200, max: 340 },
-      gravityY: 700,
-      lifespan: 700,
-      scale: { start: 3.5, end: 0.5 },
+      gravityY: 350,
+      lifespan: 1100,
+      scale: { start: 0.58, end: 0.29 },
       tint: CONFIG.BEER.foamColor,
       emitting: false
     }).setDepth(5);
 
-    this.rescueText = this.add.text(G.width / 2, G.height * 0.4, '', {
+    this.rescueBanner = this.add.image(G.width / 2, G.height * 0.42, 'plashka')
+      .setScrollFactor(0).setDepth(20).setVisible(false);
+    this.rescueMessage = this.add.text(G.width / 2, G.height * 0.42 - 50, '', {
       fontFamily: 'Arial',
       fontSize: '26px',
-      color: '#ffd166',
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      align: 'center',
-      padding: { x: 24, y: 16 }
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(20).setVisible(false);
+      color: '#ffffff',
+      align: 'center'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(21).setVisible(false);
   }
 
   drawBeer() {
@@ -264,6 +307,7 @@ class GameScene extends Phaser.Scene {
   generateKegXPositions() {
     const K = CONFIG.KEG;
     const G = CONFIG.GEN;
+    const L = this.levelCfg;
     const doorLeft = CONFIG.DOOR.x - CONFIG.DOOR.width / 2;
     const exitKegX = doorLeft - K.width / 2 - G.exitKegGap;
     const positions = [];
@@ -272,9 +316,13 @@ class GameScene extends Phaser.Scene {
 
     while (exitKegX - x > G.maxGap) {
       positions.push(x);
-      const progress = (x - startX) / (exitKegX - startX);
-      const extra = G.gapGrowth * progress;
-      x += Phaser.Math.Between(G.gapMin + extra, G.gapMax + extra);
+      if (L.equalGaps) {
+        x += G.equalGap;
+      } else {
+        const progress = (x - startX) / (exitKegX - startX);
+        const extra = L.gapGrowth * progress;
+        x += Phaser.Math.Between(G.gapMin + extra, G.gapMax + extra);
+      }
     }
 
     if (exitKegX - x < G.gapMin) {
@@ -290,11 +338,13 @@ class GameScene extends Phaser.Scene {
     const K = CONFIG.KEG;
     this.exitKeg = null;
     positions.forEach((x, i) => {
-      const topOffset = Phaser.Math.Between(K.topOffsetFromSurface, K.topOffsetMax);
+      const topOffset = this.levelCfg.variedProtrusion
+        ? Phaser.Math.Between(K.topOffsetFromSurface, K.topOffsetMax)
+        : Math.round((K.topOffsetFromSurface + K.topOffsetMax) / 2);
       const baseY = (this.beerY - topOffset) + K.height / 2;
       const keg = new Keg(this, x, baseY);
       const progress = positions.length > 1 ? i / (positions.length - 1) : 0;
-      keg.tiltAmp = K.tiltAmplitude * (1 + K.tiltAmpGrowth * progress);
+      keg.tiltAmp = this.levelCfg.rockKegs ? K.tiltAmplitude * (1 + K.tiltAmpGrowth * progress) : 0;
       if (i === positions.length - 1) {
         keg.isExitKeg = true;
         this.exitKeg = keg;
@@ -310,15 +360,20 @@ class GameScene extends Phaser.Scene {
     this.makeKegs();
   }
 
-  makePlayer() {
-    const P = CONFIG.PLAYER;
+makePlayer() {
     const D = CONFIG.DOCK;
 
-    this.player = this.physics.add.sprite(90, D.topY - P.height / 2, 'player');
+    this.player = this.physics.add.sprite(260, D.topY, 'player');
     this.player.setCollideWorldBounds(true);
-    this.player.setScale(0.8);
-    this.player.body.setSize(52, 86, false);
-    this.player.body.setOffset(30, 18);
+    this.player.setScale(0.4);
+    this.player.body.setSize(120, 205, false);
+    this.player.body.setOffset(68, 22);
+
+    const bodyOffsetY = this.player.body.offset.y * this.player.scaleY;
+    const bodyH = this.player.body.height * this.player.scaleY;
+    const spriteH = 256 * this.player.scaleY;
+    this.playerBodyBottom = bodyOffsetY + bodyH - spriteH * 0.5;
+    this.player.y = D.topY - this.playerBodyBottom;
   }
 
   makeDoor() {
@@ -330,46 +385,43 @@ class GameScene extends Phaser.Scene {
   startVictorySequence() {
     this.playerState = 'victory';
     this.hideRescuePrompt();
-    this.tweens.killTweensOf(this.player);
     SFX.door();
 
-    const keg = this.groundedKeg || this.lastKeg;
-    const D = CONFIG.DOOR;
-    const P = CONFIG.PLAYER;
-    const K = CONFIG.KEG;
-    const exitX = D.x + 60;
-    const rideY = keg
-      ? keg.baseY - K.height / 2 - P.height / 2
-      : this.beerY - 20;
+    this.time.delayedCall(0, () => {
+      this.tweens.killTweensOf(this.player);
 
-    this.player.body.enable = false;
-    this.player.setVelocity(0, 0);
+      const keg = this.groundedKeg || this.lastKeg;
+      const D = CONFIG.DOOR;
+      const exitX = D.x + 60;
 
-    this.tweens.add({
-      targets: this.door,
-      y: this.door.y - 90,
-      duration: 600,
-      ease: 'Sine.easeInOut'
-    });
+      this.player.body.enable = false;
+      this.player.setVelocity(0, 0);
 
-    if (keg) {
       this.tweens.add({
-        targets: keg,
-        x: exitX,
-        duration: 1600,
+        targets: this.door,
+        y: this.door.y - 90,
+        duration: 600,
         ease: 'Sine.easeInOut'
       });
-    }
 
-    this.tweens.add({
-      targets: this.player,
-      x: exitX,
-      y: rideY,
-      duration: 1600,
-      ease: 'Sine.easeInOut',
-      onComplete: () => {
-        this.scene.start('Victory', { points: this.points });
+      if (keg) {
+        this.tweens.add({
+          targets: keg,
+          x: exitX,
+          duration: 1600,
+          ease: 'Sine.easeInOut'
+        });
       }
+
+      this.tweens.add({
+        targets: this.player,
+        x: exitX,
+        duration: 1600,
+        ease: 'Sine.easeInOut',
+        onComplete: () => {
+          this.scene.start('Victory', { points: this.points });
+        }
+      });
     });
   }
 
@@ -386,7 +438,7 @@ class GameScene extends Phaser.Scene {
     }
 
     const dx = player.body.center.x - keg.x;
-    const threshold = CONFIG.KEG.width * (CONFIG.KEG.safeZoneRatio / 2);
+    const threshold = CONFIG.KEG.width * (this.levelCfg.safeZoneRatio / 2);
 
     if (this.groundedKeg !== keg) {
       if (keg.isInGrace(this.time.now)) {
@@ -412,25 +464,12 @@ class GameScene extends Phaser.Scene {
       }
     } else {
       if (keg.isInGrace(this.time.now)) {
-        keg.setWarningLean(0);
         return;
       }
       if (Math.abs(dx) > threshold) {
         this.tipKegUnder(player, keg, dx);
-      } else {
-        this.updateWarning(keg, dx, threshold);
       }
     }
-  }
-
-  updateWarning(keg, dx, threshold) {
-    const ratio = Math.abs(dx) / threshold;
-    let lean = 0;
-    if (ratio > CONFIG.KEG.warningStartRatio) {
-      const t = (ratio - CONFIG.KEG.warningStartRatio) / (1 - CONFIG.KEG.warningStartRatio);
-      lean = t * (dx >= 0 ? 1 : -1);
-    }
-    keg.setWarningLean(lean);
   }
 
   tipKegUnder(player, keg, dx) {
@@ -448,9 +487,25 @@ class GameScene extends Phaser.Scene {
   }
 
   updateHUD() {
-    this.hudText.setText(
-      `Баллы: ${this.points}    Спасений: ${Math.floor(this.points / CONFIG.RESCUE.cost)}    Падений: ${this.falls}`
+    this.levelText.setText(String(CONFIG.GAME.level));
+    this.pointsText.setText(String(this.points));
+    this.rescuesText.setText(String(Math.floor(this.points / CONFIG.RESCUE.cost)));
+    this.fallsText.setText(String(this.falls));
+  }
+
+  updateTimerText() {
+    const remaining = Math.max(0, this.timerEnd - this.time.now);
+    const secs = Math.ceil(remaining / 1000);
+    const mm = Math.floor(secs / 60);
+    const ss = secs % 60;
+    this.timerText.setText(
+      String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0')
     );
+    if (remaining <= 0 && !this.timeUp) {
+      this.timeUp = true;
+      this.timeUpText.setVisible(true);
+      this.hideRescuePrompt();
+    }
   }
 
   handleInput(delta) {
@@ -492,6 +547,7 @@ class GameScene extends Phaser.Scene {
     this.checkFall();
     this.updateCamera();
     this.handleRescuePrompt();
+    this.updateTimerText();
   }
 
   updateKegs(time) {
@@ -517,7 +573,7 @@ class GameScene extends Phaser.Scene {
 
     this.splashEmitter.x = this.player.x;
     this.splashEmitter.y = this.beerY;
-    this.splashEmitter.explode(12);
+    this.splashEmitter.explode(36);
     SFX.splash();
 
     this.tweens.add({
@@ -529,15 +585,15 @@ class GameScene extends Phaser.Scene {
   }
 
   showRescuePrompt() {
-    const canRescue = this.points >= CONFIG.RESCUE.cost && this.fallenFromKeg;
-    const lines = ['Ты упал в пиво!'];
-    if (canRescue) lines.push('[R] — спастись (2 балла)');
-    lines.push('[Enter] — вернуться к старту');
-    this.rescueText.setText(lines.join('\n')).setVisible(true);
+    const msg = CONFIG.FALL_MESSAGES[this.fallMessageIndex % CONFIG.FALL_MESSAGES.length];
+    this.fallMessageIndex++;
+
+    this.rescueBanner.setVisible(true);
+    this.rescueMessage.setText(msg).setVisible(true);
   }
 
   handleRescuePrompt() {
-    if (this.playerState !== 'fallen' || !this.rescueText.visible) return;
+    if (this.playerState !== 'fallen' || !this.rescueBanner.visible) return;
 
     const canRescue = this.points >= CONFIG.RESCUE.cost && this.fallenFromKeg;
     if (canRescue && Phaser.Input.Keyboard.JustDown(this.rescueKey)) {
@@ -548,7 +604,8 @@ class GameScene extends Phaser.Scene {
   }
 
   hideRescuePrompt() {
-    this.rescueText.setVisible(false);
+    this.rescueBanner.setVisible(false);
+    this.rescueMessage.setVisible(false);
   }
 
   doRescue() {
@@ -571,7 +628,7 @@ class GameScene extends Phaser.Scene {
 
     const P = CONFIG.PLAYER;
     const K = CONFIG.KEG;
-    const targetY = keg.baseY - K.height / 2 - P.height / 2;
+    const targetY = keg.baseY - K.height / 2 - this.playerBodyBottom;
 
     this.player.body.enable = false;
     this.tweens.add({
@@ -605,7 +662,6 @@ class GameScene extends Phaser.Scene {
   }
 
   resetPlayer() {
-    const P = CONFIG.PLAYER;
     const D = CONFIG.DOCK;
     const cam = this.cameras.main;
 
@@ -616,7 +672,7 @@ class GameScene extends Phaser.Scene {
 
     cam.fadeOut(250, 0, 0, 0);
     cam.once('camerafadeoutcomplete', () => {
-      this.player.setPosition(90, D.topY - P.height / 2);
+      this.player.setPosition(260, D.topY - this.playerBodyBottom);
       this.player.setVelocity(0, 0);
       this.player.body.setAllowGravity(true);
       this.player.setAlpha(1);

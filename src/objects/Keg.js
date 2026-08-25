@@ -5,6 +5,8 @@ class Keg extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
 
     this.setDisplaySize(CONFIG.KEG.width, CONFIG.KEG.height);
+    this.body.setSize(CONFIG.KEG.width, CONFIG.KEG.height);
+    this.body.setOffset((this.width - CONFIG.KEG.width) / 2, 0);
 
     this.body.setAllowGravity(false);
     this.body.setImmovable(true);

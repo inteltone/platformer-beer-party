@@ -4,8 +4,25 @@ const CONFIG = {
     height: 720,
     worldWidth: 4000,
     backgroundColor: '#828282',
-    gravityY: 1800
+    gravityY: 1800,
+    level: 1
   },
+
+  LEVELS: [
+    { equalGaps: true,  gapGrowth: 0,  rockKegs: false, safeZoneRatio: 0.5, time: 60, variedProtrusion: false },
+    { equalGaps: false, gapGrowth: 0,  rockKegs: false, safeZoneRatio: 0.5, time: 50, variedProtrusion: false },
+    { equalGaps: false, gapGrowth: 20, rockKegs: true,  safeZoneRatio: 0.5, time: 40, variedProtrusion: true },
+    { equalGaps: false, gapGrowth: 20, rockKegs: true,  safeZoneRatio: 0.4, time: 30, variedProtrusion: true }
+  ],
+
+  FALL_MESSAGES: [
+    'Эх! Не повезло!',
+    'Ты снова искупался!',
+    'Это заплыв, а не забег!',
+    'Ты опять нырнул!',
+    'Ты станешь героем мема!',
+    'Пиво - твоя стихия!'
+  ],
 
   BEER: {
     surfaceRatio: 0.786,
@@ -80,6 +97,7 @@ const CONFIG = {
   GEN: {
     gapMin: 190,
     gapMax: 245,
+    equalGap: 218,
     gapGrowth: 20,
     maxGap: 270,
     firstKegOffset: 60,
