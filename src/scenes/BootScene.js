@@ -4,8 +4,12 @@ class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.svg('partyText', 'assets/party-text.svg');
     this.load.image('keg', 'assets/keg.png');
+    this.load.image('player', 'assets/player.png');
+    this.load.image('brick', 'assets/texture-brick.png');
+    this.load.image('bgtexture', 'assets/texture-bg.png');
+    this.load.image('nameplate', 'assets/nameplate.png');
+    this.load.image('header', 'assets/header.png');
   }
 
   create() {
@@ -31,20 +35,22 @@ function createPlaceholderTextures(scene) {
   g.generateTexture('platform', 32, 32);
   g.clear();
 
-  g.fillStyle(P.color, 1);
-  g.fillRoundedRect(6, 20, 32, 38, 6);
-  g.fillStyle(0x2f3b52, 1);
-  g.fillRect(10, 52, 10, 10);
-  g.fillRect(24, 52, 10, 10);
-  g.fillStyle(P.color, 1);
-  g.fillRect(2, 28, 6, 18);
-  g.fillRect(36, 28, 6, 18);
-  g.fillStyle(P.skin, 1);
-  g.fillCircle(22, 12, 9);
-  g.fillStyle(P.accent, 1);
-  g.fillRect(13, 3, 18, 6);
-  g.generateTexture('player', P.width, P.height);
-  g.clear();
+  if (!scene.textures.exists('player')) {
+    g.fillStyle(P.color, 1);
+    g.fillRoundedRect(6, 20, 32, 38, 6);
+    g.fillStyle(0x2f3b52, 1);
+    g.fillRect(10, 52, 10, 10);
+    g.fillRect(24, 52, 10, 10);
+    g.fillStyle(P.color, 1);
+    g.fillRect(2, 28, 6, 18);
+    g.fillRect(36, 28, 6, 18);
+    g.fillStyle(P.skin, 1);
+    g.fillCircle(22, 12, 9);
+    g.fillStyle(P.accent, 1);
+    g.fillRect(13, 3, 18, 6);
+    g.generateTexture('player', P.width, P.height);
+    g.clear();
+  }
 
   if (!scene.textures.exists('keg')) {
     g.fillStyle(K.bodyColor, 1);

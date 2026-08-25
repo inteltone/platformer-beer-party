@@ -8,7 +8,7 @@ const CONFIG = {
   },
 
   BEER: {
-    surfaceRatio: 0.85,
+    surfaceRatio: 0.786,
     color: 0x824e00,
     bodyAlpha: 0.9,
     overlayAlpha: 0.55,
@@ -31,8 +31,9 @@ const CONFIG = {
   },
 
   DOCK: {
-    topY: 585,
-    width: 280,
+    topY: 513,
+    width: 410,
+    height: 207,
     color: 0xcdcdcd,
     plank: 0x6b4423
   },

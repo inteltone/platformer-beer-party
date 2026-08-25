@@ -21,11 +21,14 @@ class GameScene extends Phaser.Scene {
 
     this.physics.world.setBounds(0, 0, G.worldWidth, G.height);
 
+    this.add.tileSprite(G.worldWidth / 2, G.height / 2, G.worldWidth, G.height, 'bgtexture').setDepth(-0.5);
+
+    if (this.textures.exists('header')) {
+      const hH = this.textures.get('header').get(0).height;
+      this.add.image(G.width / 2, hH / 2, 'header').setDepth(30).setScrollFactor(0);
+    }
     this.drawBeer();
     this.drawBeerBubbles();
-    if (this.textures.exists('partyText')) {
-      this.add.image(640, CONFIG.GAME.height * 0.3, 'partyText').setDepth(-2).setScrollFactor(0).setTint(0x3a3a3a);
-    }
     this.makePlatforms();
     this.makePlayer();
     this.makeDoor();
@@ -86,7 +89,7 @@ class GameScene extends Phaser.Scene {
     body.fillStyle(B.color, B.bodyAlpha);
     body.fillRect(0, y, G.worldWidth, G.height - y);
 
-    this.beerOverlay = this.add.graphics().setDepth(1);
+    this.beerOverlay = this.add.graphics().setDepth(6);
     this.beerOverlay.fillStyle(B.color, B.overlayAlpha);
     this.beerOverlay.fillRect(0, y, G.worldWidth, G.height - y);
 
@@ -120,11 +123,19 @@ class GameScene extends Phaser.Scene {
       } else {
         g.fillCircle(x, cy, s);
       }
-      elements.push({ x, cy, rx, ry: s });
+      elements.push({ x, cy: surfY - s, rx, ry: s });
 
       x += (rx + prevRx) * 0.5;
       prevRx = rx;
     }
+
+    g.generateTexture('foam', G.worldWidth, H);
+
+    this.add.image(G.worldWidth / 2, surfY - H / 2, 'foam').setDepth(7);
+
+    const copy = this.add.image(G.worldWidth / 2, surfY, 'foam').setDepth(7);
+    copy.setFlipX(true);
+    copy.setFlipY(true);
 
     const bubbles = [];
     const isInside = (bx, by, br) => {
@@ -177,18 +188,11 @@ class GameScene extends Phaser.Scene {
       placedGroups++;
     }
 
-    g.lineStyle(1, B.color, 0.85);
+    const bg = this.add.graphics().setDepth(7.5);
+    bg.lineStyle(1, B.color, 0.85);
     for (const b of bubbles) {
-      g.strokeCircle(b.x, b.y, b.r);
+      bg.strokeCircle(b.x, b.y, b.r);
     }
-
-    g.generateTexture('foam', G.worldWidth, H);
-
-    this.add.image(G.worldWidth / 2, surfY - H / 2, 'foam').setDepth(2);
-
-    const copy = this.add.image(G.worldWidth / 2, surfY, 'foam').setDepth(2);
-    copy.setFlipX(true);
-    copy.setFlipY(true);
   }
 
   drawBeerBubbles() {
@@ -229,21 +233,32 @@ class GameScene extends Phaser.Scene {
   }
 
   makePlatforms() {
-    const G = CONFIG.GAME;
     const D = CONFIG.DOCK;
 
     this.platforms = this.physics.add.staticGroup();
 
-    const pierH = G.height - D.topY;
-    this.makePlatform(D.width / 2, D.topY + pierH / 2, D.width, pierH);
-  }
+    const pierX = D.width / 2;
+    const pierY = D.topY + D.height / 2;
 
-  makePlatform(x, y, w, h) {
-    const p = this.platforms.create(x, y, 'platform');
-    p.setDisplaySize(w, h);
-    p.body.setSize(w, h);
-    p.refreshBody();
-    return p;
+    const bg = this.add.rectangle(pierX, pierY, D.width, D.height, D.color);
+    this.physics.add.existing(bg, true);
+    this.platforms.add(bg);
+
+    this.add.tileSprite(pierX, pierY, D.width, D.height, 'brick');
+
+    const outline = this.add.graphics().setDepth(0);
+    outline.lineStyle(3, 0x333333, 1);
+    outline.beginPath();
+    outline.moveTo(0, D.topY);
+    outline.lineTo(D.width, D.topY);
+    outline.lineTo(D.width, D.topY + D.height);
+    outline.strokePath();
+
+    if (this.textures.exists('nameplate')) {
+      const npH = this.textures.get('nameplate').get(0).height;
+      const npY = D.topY + D.height - 20 - npH / 2;
+      this.add.image(D.width / 2, npY, 'nameplate').setDepth(0);
+    }
   }
 
   generateKegXPositions() {
@@ -301,6 +316,9 @@ class GameScene extends Phaser.Scene {
 
     this.player = this.physics.add.sprite(90, D.topY - P.height / 2, 'player');
     this.player.setCollideWorldBounds(true);
+    this.player.setScale(0.8);
+    this.player.body.setSize(52, 86, false);
+    this.player.body.setOffset(30, 18);
   }
 
   makeDoor() {
