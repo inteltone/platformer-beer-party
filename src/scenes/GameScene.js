@@ -528,8 +528,10 @@ makePlayer() {
 
     if (this.cursors.left.isDown) {
       p.setVelocityX(-P.speed);
+      p.setFlipX(true);
     } else if (this.cursors.right.isDown) {
       p.setVelocityX(P.speed);
+      p.setFlipX(false);
     } else {
       p.setVelocityX(0);
     }
@@ -588,8 +590,19 @@ makePlayer() {
     const msg = CONFIG.FALL_MESSAGES[this.fallMessageIndex % CONFIG.FALL_MESSAGES.length];
     this.fallMessageIndex++;
 
-    this.rescueBanner.setVisible(true);
-    this.rescueMessage.setText(msg).setVisible(true);
+    this.rescueBanner.setScale(0.3).setAlpha(0).setVisible(true);
+    this.rescueMessage.setScale(0.3).setAlpha(0).setVisible(true);
+
+    this.tweens.add({
+      targets: [this.rescueBanner, this.rescueMessage],
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 1,
+      duration: 400,
+      ease: 'Back.easeOut'
+    });
+
+    this.rescueMessage.setText(msg);
   }
 
   handleRescuePrompt() {

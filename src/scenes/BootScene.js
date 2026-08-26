@@ -12,6 +12,10 @@ class BootScene extends Phaser.Scene {
     this.load.image('nameplate', 'assets/nameplate.png');
     this.load.image('header', 'assets/header.png');
     this.load.image('plashka', 'assets/plashka.png');
+    this.load.image('screenStart', 'assets/screen-start.png');
+    this.load.image('btnStart', 'assets/btn-start.png');
+    this.load.image('btnLevelOpen', 'assets/btn-level-open.png');
+    this.load.image('btnLevelClosed', 'assets/btn-level-closed.png');
   }
 
   create() {

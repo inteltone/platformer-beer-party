@@ -4,60 +4,54 @@ class MenuScene extends Phaser.Scene {
   }
 
   create() {
-    const { width, height } = CONFIG.GAME;
+    this.add.image(640, 360, 'screenStart').setDepth(0);
 
-    this.add.text(width / 2, 120, 'ПИВНОЙ ПОБЕГ', {
-      fontFamily: 'Arial',
-      fontSize: '64px',
-      fontStyle: 'bold',
-      color: '#ffd166'
-    }).setOrigin(0.5);
+    this.btnStart = this.add.image(640, 666.5, 'btnStart')
+      .setDepth(1)
+      .setInteractive({ useHandCursor: true });
 
-    this.add.text(width / 2, 180, 'Прыжки по плавающим кегам', {
-      fontFamily: 'Arial',
-      fontSize: '24px',
-      color: '#444444'
-    }).setOrigin(0.5);
-
-    const rules = [
-      'ПРАВИЛА:',
-      '',
-      '•  Управление — стрелки: ← → движение, ↑ прыжок.',
-      '•  Склад затоплен пивом. Прыгай по плавающим кегам',
-      '   до выходной двери.',
-      '•  Середина кега (40% ширины) держит тебя.',
-      '   Попадание на край (по 30% слева и справа)',
-      '   переворачивает кег — ты падаешь в пиво.',
-      '•  За каждый удачный прыжок — 1 балл.',
-      '   Спасение после падения стоит 2 балла:',
-      '   нажми R — и снова окажешься на кеге',
-      '   вместо возврата к старту.',
-      '•  Доберись до последнего кега у двери,',
-      '   приземлись на него — и пиво вынесет тебя наружу.'
-    ];
-
-    this.add.text(width / 2, 250, rules.join('\n'), {
-      fontFamily: 'Arial',
-      fontSize: '22px',
-      color: '#222222',
-      align: 'center',
-      lineSpacing: 6
-    }).setOrigin(0.5, 0);
-
-    const hint = this.add.text(width / 2, height - 90, 'Нажми Enter, чтобы начать', {
-      fontFamily: 'Arial',
-      fontSize: '28px',
-      fontStyle: 'bold',
-      color: '#4d8df0'
-    }).setOrigin(0.5);
-
-    this.tweens.add({
-      targets: hint,
-      alpha: 0.3,
-      duration: 700,
-      yoyo: true,
-      repeat: -1
+    this.heartbeat = this.tweens.chain({
+      targets: this.btnStart,
+      tweens: [
+        { scaleX: 1.15, scaleY: 1.15, duration: 250, ease: 'Sine.easeOut' },
+        { scaleX: 1, scaleY: 1, duration: 250, ease: 'Sine.easeOut' },
+        { scaleX: 1.15, scaleY: 1.15, duration: 250, ease: 'Sine.easeOut' },
+        { scaleX: 1, scaleY: 1, duration: 250, ease: 'Sine.easeOut' },
+        { alpha: 1, duration: 4000 }
+      ],
+      loop: -1
     });
+
+    this.btnStart.on('pointerdown', () => {
+      this.scene.start('Game');
+    });
+
+    this.levelButtons = [];
+    const levelPositions = [856, 936, 1016, 1096];
+    for (let i = 0; i < 4; i++) {
+      const isOpen = i === 0;
+      const key = isOpen ? 'btnLevelOpen' : 'btnLevelClosed';
+      const btn = this.add.image(levelPositions[i], 609, key)
+        .setDepth(1)
+        .setAlpha(isOpen ? 1 : 0.25);
+
+      const num = this.add.text(levelPositions[i], 612, String(i + 1), {
+        fontFamily: 'Arial',
+        fontSize: '28px',
+        fontStyle: 'bold',
+        color: '#ffffff'
+      }).setOrigin(0.5).setDepth(2).setAlpha(isOpen ? 1 : 0.25);
+
+      if (isOpen) {
+        btn.setInteractive({ useHandCursor: true });
+        btn.on('pointerdown', () => {
+          CONFIG.GAME.level = i + 1;
+          this.scene.start('Game');
+        });
+      }
+
+      this.levelButtons.push({ btn, num, isOpen });
+    }
 
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     this.input.keyboard.once('keydown', () => SFX.unlock());
