@@ -639,6 +639,10 @@ makePlayer() {
         this.groundedKeg = keg;
         this.lastKeg = keg;
         keg.setWarningLean(0);
+        if (!keg.scored) {
+          keg.scored = true;
+          this.addPoint();
+        }
         return;
       }
 
@@ -957,9 +961,12 @@ makePlayer() {
   findNearestKeg() {
     let nearest = null;
     let minDist = Infinity;
+    const finishLeft = CONFIG.GAME.worldWidth - CONFIG.FINISH.width;
     this.kegList.forEach((keg) => {
       if (keg.state !== 'floating') return;
-      const dist = Math.abs(keg.x - this.player.x);
+      if (keg.x <= this.player.x) return;
+      if (keg.x > finishLeft - 20) return;
+      const dist = keg.x - this.player.x;
       if (dist < minDist) {
         minDist = dist;
         nearest = keg;

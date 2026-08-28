@@ -24,7 +24,7 @@ class MenuScene extends Phaser.Scene {
 
     this.btnStart.on('pointerdown', () => {
       CONFIG.GAME.level = CONFIG.GAME.unlockedLevel;
-      this.scene.start('Game');
+      this.goToGame();
     });
 
     this.levelButtons = [];
@@ -48,7 +48,7 @@ class MenuScene extends Phaser.Scene {
         btn.setInteractive({ useHandCursor: true });
         btn.on('pointerdown', () => {
           CONFIG.GAME.level = i + 1;
-          this.scene.start('Game');
+          this.goToGame();
         });
       }
 
@@ -56,19 +56,21 @@ class MenuScene extends Phaser.Scene {
     }
 
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-    this.input.keyboard.once('keydown', () => {
+    const unlock = () => {
       SFX.unlock();
       this.sound.unlock();
-    });
-    this.input.once('pointerdown', () => {
-      SFX.unlock();
-      this.sound.unlock();
-    });
+    };
+    this.input.keyboard.once('keydown', unlock);
+    this.input.once('pointerdown', unlock);
+  }
+
+  goToGame() {
+    this.scene.start('Game');
   }
 
   update() {
     if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-      this.scene.start('Game');
+      this.goToGame();
     }
   }
 }

@@ -4,39 +4,13 @@ class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('keg', 'assets/keg.png');
-    this.load.image('player', 'assets/player.png');
-    this.load.image('brick', 'assets/texture-brick.png');
-    this.load.image('bgtexture', 'assets/texture-bg.png');
-    this.load.image('truby', 'assets/truby.png');
-    this.load.image('nameplate', 'assets/nameplate.png');
-    this.load.image('header', 'assets/header.png');
-    this.load.image('plashka', 'assets/plashka.png');
-    this.load.image('plashkaLevelSuccess', 'assets/plashka-level-success.png');
-    this.load.image('screenVictory', 'assets/screen-victory.png');
+    // Только лёгкие ассеты — чтобы экран загрузки показался мгновенно.
     this.load.image('screenLoading', 'assets/screen-loading.png');
     this.load.spritesheet('mug', 'assets/mug-spritesheet.png', { frameWidth: 285, frameHeight: 440 });
-    this.load.image('screenStart', 'assets/screen-start.png');
-    this.load.image('btnStart', 'assets/btn-start.png');
-    this.load.image('btnLevelOpen', 'assets/btn-level-open.png');
-    this.load.image('btnLevelClosed', 'assets/btn-level-closed.png');
-    this.load.image('btnHome', 'assets/btn-home.png');
-    this.load.image('cup', 'assets/cup.png');
-    this.load.image('cupLuchi', 'assets/cup-luchi.png');
-    this.load.image('lamp', 'assets/lamp.png');
-    this.load.spritesheet('playerKon', 'assets/player-kon-sprite.png', { frameWidth: 256, frameHeight: 256 });
-    this.load.audio('people', 'assets/sounds/people.mp3');
-    this.load.audio('keg', 'assets/sounds/keg.mp3');
-    this.load.audio('fanfary', 'assets/sounds/fanfary.mp3');
-    this.load.audio('fall', 'assets/sounds/fall.mp3');
-    this.load.audio('oh', 'assets/sounds/oh.mp3');
-    this.load.audio('cry', 'assets/sounds/cry.mp3');
   }
 
   create() {
-    createPlaceholderTextures(this);
-    createPlayerAnimations(this);
-    if (this.anims.exists('mugAnim') === false && this.textures.exists('mug')) {
+    if (!this.anims.exists('mugAnim') && this.textures.exists('mug')) {
       this.anims.create({
         key: 'mugAnim',
         frames: this.anims.generateFrameNumbers('mug', { start: 0, end: 24 }),
@@ -44,11 +18,6 @@ class BootScene extends Phaser.Scene {
         repeat: -1
       });
     }
-    ['keg', 'people', 'fanfary', 'fall', 'oh', 'cry'].forEach((key) => {
-      if (this.cache.audio.exists(key)) {
-        this.sound.add(key);
-      }
-    });
     this.scene.start('Loading');
   }
 }
@@ -81,7 +50,7 @@ function createPlayerAnimations(scene) {
   if (!scene.anims.exists('playerFall')) {
     scene.anims.create({
       key: 'playerFall',
-      frames: scene.anims.generateFrameNumbers('playerKon', { start: 16, end: 17 }),
+      frames: scene.anims.generateFrameNumbers('playerKon', { start: 16, end: 16 }),
       frameRate: 8,
       repeat: 0
     });
