@@ -5,13 +5,16 @@ class VictoryScene extends Phaser.Scene {
 
   init(data) {
     this.points = data && data.points ? data.points : 0;
+    this.level = data && data.level ? data.level : 1;
   }
 
   create() {
     const { width, height } = CONFIG.GAME;
 
-    SFX.unlock();
-    SFX.victory();
+    const nextLevel = Math.min(this.level + 1, 2);
+    if (nextLevel > CONFIG.GAME.unlockedLevel) {
+      CONFIG.GAME.unlockedLevel = nextLevel;
+    }
 
     this.add.text(width / 2, 200, 'ПОБЕДА!', {
       fontFamily: 'Arial',

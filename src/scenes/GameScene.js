@@ -18,7 +18,6 @@ class GameScene extends Phaser.Scene {
     this.groundedKeg = null;
     this.lastKeg = null;
     this.fallenFromKeg = null;
-    this.fallMessageIndex = 0;
     this.levelCfg = CONFIG.LEVELS[CONFIG.GAME.level - 1] || CONFIG.LEVELS[0];
 
     this.physics.world.setBounds(0, 0, G.worldWidth, G.height);
@@ -33,28 +32,55 @@ class GameScene extends Phaser.Scene {
       const hH = this.textures.get('header').get(0).height;
       this.add.image(G.width / 2, hH / 2, 'header').setDepth(30).setScrollFactor(0);
     }
+
+    if (this.textures.exists('lamp')) {
+      const lampW = this.textures.get('lamp').get(0).width;
+      for (let x = 400; x < G.worldWidth; x += lampW + 270) {
+        this.add.image(x, 174, 'lamp').setDepth(29);
+      }
+    }
+
     this.drawBeer();
     this.drawBeerBubbles();
     this.makePlatforms();
+    this.makeFinishPlatform();
     this.makePlayer();
-    this.makeDoor();
 
     this.kegs = this.physics.add.group({
       allowGravity: false,
       immovable: true
     });
-    this.makeKegs();
+    if (this.levelCfg.drifting) {
+      this.makeDriftingKegs();
+    } else {
+      this.makeKegs();
+    }
 
-    this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.player, this.kegs, this.handleKegContact, null, this);
+    // Игрок сталкивается с платформами (пристыгивает к дну/финишу), но
+    // только когда НЕ сидит на дрейфующей кеге. Если кега плывёт мимо
+    // платформы, столкновение с ней выбрасывает игрока в пиво — поэтому для
+    // игрока на кеге столкновение с платформами отключается.
+    this.physics.add.collider(this.player, this.platforms, null, () => {
+      return !(this.levelCfg.drifting && this.groundedKeg);
+    }, this);
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.rescueKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    if (this.textures.exists('btnHome')) {
+      const homeBtn = this.add.image(30, 34, 'btnHome')
+        .setScrollFactor(0)
+        .setDepth(32)
+        .setInteractive({ useHandCursor: true });
+      homeBtn.on('pointerdown', () => {
+        this.scene.start('Menu');
+      });
+    }
 
     const mono = 'Courier New, monospace';
 
-    this.levelText = this.add.text(308, 25.5, '1', {
+    this.levelText = this.add.text(318, 25.5, '1', {
       fontFamily: mono,
       fontSize: '32px',
       fontStyle: 'bold',
@@ -82,26 +108,17 @@ class GameScene extends Phaser.Scene {
       color: '#ff0000'
     }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31);
 
-    this.timerText = this.add.text(1184, 35, '00:60', {
+    this.timerText = this.add.text(1174, 35, '00:00', {
       fontFamily: mono,
       fontSize: '28px',
       fontStyle: 'bold',
       color: '#00ff42'
     }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31);
 
-    this.timeUp = false;
-    this.timeUpText = this.add.text(G.width / 2, G.height * 0.35, 'Время истекло', {
-      fontFamily: 'Arial',
-      fontSize: '52px',
-      fontStyle: 'bold',
-      color: '#ff0000',
-      backgroundColor: 'rgba(0,0,0,0.75)',
-      padding: { x: 32, y: 18 }
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(25).setVisible(false);
-
-    this.timerEnd = this.time.now + this.levelCfg.time * 1000;
+    this.timerStarted = false;
+    this.finishCupShown = false;
+    this.lastDriftVelocity = 0;
     this.updateHUD();
-    this.updateTimerText();
 
     this.splashEmitter = this.add.particles(0, 0, 'circle', {
       speed: { min: 80, max: 220 },
@@ -114,13 +131,21 @@ class GameScene extends Phaser.Scene {
     }).setDepth(5);
 
     this.rescueBanner = this.add.image(G.width / 2, G.height * 0.42, 'plashka')
-      .setScrollFactor(0).setDepth(20).setVisible(false);
-    this.rescueMessage = this.add.text(G.width / 2, G.height * 0.42 - 50, '', {
-      fontFamily: 'Arial',
-      fontSize: '26px',
-      color: '#ffffff',
-      align: 'center'
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(21).setVisible(false);
+      .setScrollFactor(0).setDepth(40).setVisible(false);
+
+    this.levelSuccessPanel = this.add.image(G.width / 2, G.height / 2, 'plashkaLevelSuccess')
+      .setScrollFactor(0).setDepth(50).setVisible(false)
+      .setInteractive({ useHandCursor: true });
+    this.victoryScreen = this.add.image(G.width / 2, G.height / 2, 'screenVictory')
+      .setScrollFactor(0).setDepth(50).setVisible(false)
+      .setInteractive({ useHandCursor: true });
+    this.levelSuccessPanel.on('pointerdown', () => {
+      if (this.levelSuccessShown) this.advanceToNextLevel();
+    });
+    this.victoryScreen.on('pointerdown', () => {
+      if (this.levelSuccessShown) this.advanceToNextLevel();
+    });
+    this.levelSuccessShown = false;
   }
 
   drawBeer() {
@@ -308,8 +333,9 @@ class GameScene extends Phaser.Scene {
     const K = CONFIG.KEG;
     const G = CONFIG.GEN;
     const L = this.levelCfg;
-    const doorLeft = CONFIG.DOOR.x - CONFIG.DOOR.width / 2;
-    const exitKegX = doorLeft - K.width / 2 - G.exitKegGap;
+    const F = CONFIG.FINISH;
+    const finishLeft = CONFIG.GAME.worldWidth - F.width;
+    const exitKegX = finishLeft - K.width / 2 - G.exitKegGap;
     const positions = [];
     const startX = CONFIG.DOCK.width + G.firstKegOffset;
     let x = startX;
@@ -336,7 +362,6 @@ class GameScene extends Phaser.Scene {
   makeKegs() {
     const positions = this.generateKegXPositions();
     const K = CONFIG.KEG;
-    this.exitKeg = null;
     positions.forEach((x, i) => {
       const topOffset = this.levelCfg.variedProtrusion
         ? Phaser.Math.Between(K.topOffsetFromSurface, K.topOffsetMax)
@@ -346,24 +371,111 @@ class GameScene extends Phaser.Scene {
       const progress = positions.length > 1 ? i / (positions.length - 1) : 0;
       keg.tiltAmp = this.levelCfg.rockKegs ? K.tiltAmplitude * (1 + K.tiltAmpGrowth * progress) : 0;
       if (i === positions.length - 1) {
-        keg.isExitKeg = true;
-        this.exitKeg = keg;
+        keg.isLastKeg = true;
       }
       this.kegs.add(keg);
     });
     this.kegList = this.kegs.getChildren();
   }
 
+  makeDriftingKegs() {
+    const D = CONFIG.DRIFT;
+    const K = CONFIG.KEG;
+    const G = CONFIG.GAME;
+    const startX = CONFIG.DOCK.width + 100;
+    const endX = G.worldWidth + 800;
+
+    let x = startX;
+    let i = 0;
+    while (x < endX && i < D.kegCount) {
+      const topOffset = Phaser.Math.Between(K.topOffsetFromSurface, K.topOffsetMax);
+      const baseY = (this.beerY - topOffset) + K.height / 2;
+      const keg = new DriftingKeg(this, x, baseY);
+      this.kegs.add(keg);
+      i++;
+      x += K.width + Phaser.Math.Between(D.gapMin, D.gapMax);
+    }
+    this.kegList = this.kegs.getChildren();
+  }
+
+  updateDriftingKegs(time) {
+    const D = CONFIG.DRIFT;
+    const K = CONFIG.KEG;
+    const G = CONFIG.GAME;
+    const finishLeft = G.worldWidth - CONFIG.FINISH.width;
+
+    // Remaining kegs keep drifting (bob/sway/digest) even after the player
+    // reaches the finish or is otherwise out of play — only recycling /
+    // spawning of new kegs pauses once victory begins.
+    this.kegList.forEach((keg) => keg.update(time));
+
+    if (this.finishCupShown) return;
+
+    this.kegList.sort((a, b) => a.x - b.x);
+
+    // Rightmost *active* keg — recycling must extend the floating train,
+    // not jump to a (possibly sunk) keg dangling at the far right edge.
+    const floating = this.kegList.filter((k) => k.state === 'floating').sort((a, b) => a.x - b.x);
+    const rightMost = floating.length ? floating[floating.length - 1] : null;
+
+    // Recycle kegs that drifted off the left edge OR sank into the dock,
+    // re-injecting them just behind the rightmost floating keg. This keeps
+    // the train contiguous and prevents the active-keg pool from shrinking
+    // as kegs sink.
+    let extended = false;
+    this.kegList.forEach((keg) => {
+      const offLeft = keg.state === 'floating' && keg.x < -K.width;
+      const sunk = keg.state === 'sinking';
+      if (!offLeft && !sunk) return;
+
+      const baseX = rightMost
+        ? rightMost.x + K.width + Phaser.Math.Between(D.gapMin, D.gapMax)
+        : finishLeft - K.width / 2 - Phaser.Math.Between(0, 120);
+
+      const topOffset = Phaser.Math.Between(K.topOffsetFromSurface, K.topOffsetMax);
+      keg.baseY = (this.beerY - topOffset) + K.height / 2;
+      keg.recycle();
+      keg.x = baseX;
+      extended = true;
+    });
+
+    if (extended) {
+      this.kegList.sort((a, b) => a.x - b.x);
+    }
+
+    // Keep the finish reachable: if no floating keg is near the finish,
+    // advance the leftmost floating keg forward to just ahead of the
+    // rightmost — a short hop that preserves train density instead of
+    // teleporting a keg from the far left edge across the whole level.
+    const nowFloating = this.kegList.filter((k) => k.state === 'floating').sort((a, b) => a.x - b.x);
+    const nearFinish = nowFloating.some((k) => k.x > finishLeft - K.width * 2);
+    if (!nearFinish && nowFloating.length >= 2) {
+      const leftMost = nowFloating[0];
+      const right = nowFloating[nowFloating.length - 1];
+      if (leftMost !== right) {
+        const topOffset = Phaser.Math.Between(K.topOffsetFromSurface, K.topOffsetMax);
+        leftMost.baseY = (this.beerY - topOffset) + K.height / 2;
+        leftMost.recycle();
+        leftMost.x = right.x + K.width + Phaser.Math.Between(D.gapMin, D.gapMax);
+        this.kegList.sort((a, b) => a.x - b.x);
+      }
+    }
+  }
+
   regenerateLevel() {
     this.kegs.clear(true, true);
     this.kegList = [];
-    this.makeKegs();
+    if (this.levelCfg.drifting) {
+      this.makeDriftingKegs();
+    } else {
+      this.makeKegs();
+    }
   }
 
 makePlayer() {
     const D = CONFIG.DOCK;
 
-    this.player = this.physics.add.sprite(260, D.topY, 'player');
+    this.player = this.physics.add.sprite(260, D.topY, this.textures.exists('playerKon') ? 'playerKon' : 'player');
     this.player.setCollideWorldBounds(true);
     this.player.setScale(0.4);
     this.player.body.setSize(120, 205, false);
@@ -374,55 +486,137 @@ makePlayer() {
     const spriteH = 256 * this.player.scaleY;
     this.playerBodyBottom = bodyOffsetY + bodyH - spriteH * 0.5;
     this.player.y = D.topY - this.playerBodyBottom;
+
+    if (this.textures.exists('playerKon')) {
+      this.player.play('playerIdle');
+    }
   }
 
-  makeDoor() {
-    const D = CONFIG.DOOR;
-    const doorY = this.beerY + D.submerged - D.height / 2;
-    this.door = this.add.image(D.x, doorY, 'door');
+  makeFinishPlatform() {
+    const F = CONFIG.FINISH;
+    const G = CONFIG.GAME;
+    const centerX = G.worldWidth - F.width / 2;
+    const centerY = F.topY + F.height / 2;
+
+    const bg = this.add.rectangle(centerX, centerY, F.width, F.height, F.color);
+    this.physics.add.existing(bg, true);
+    this.platforms.add(bg);
+
+    this.add.tileSprite(centerX, centerY, F.width, F.height, 'brick')
+      .setFlipX(true);
+
+    const outline = this.add.graphics().setDepth(0);
+    outline.lineStyle(3, 0x333333, 1);
+    outline.beginPath();
+    outline.moveTo(G.worldWidth - F.width, F.topY);
+    outline.lineTo(G.worldWidth, F.topY);
+    outline.strokePath();
+
+    outline.beginPath();
+    outline.moveTo(G.worldWidth - F.width, F.topY);
+    outline.lineTo(G.worldWidth - F.width, F.topY + F.height);
+    outline.strokePath();
+
+    this.finishPlatform = bg;
   }
 
-  startVictorySequence() {
-    this.playerState = 'victory';
-    this.hideRescuePrompt();
-    SFX.door();
+  showCup() {
+    const F = CONFIG.FINISH;
+    const G = CONFIG.GAME;
+    const cupScale = 1;
+    const cupCenterX = G.worldWidth - F.width / 2;
+    const cupBottomY = F.topY;
+    const cupH = this.textures.get('cup').get(0).height * cupScale;
+    const cupY = cupBottomY - cupH / 2;
+    const labelY = -cupH / 2 + 41;
 
-    this.time.delayedCall(0, () => {
-      this.tweens.killTweensOf(this.player);
+    const luchi = this.add.image(0, labelY, 'cupLuchi');
+    const cup = this.add.image(0, 0, 'cup').setScale(cupScale);
+    const label = this.add.text(0, labelY, String(CONFIG.GAME.level), {
+      fontFamily: 'Arial',
+      fontSize: '32px',
+      fontStyle: 'bold',
+      color: '#fed330'
+    }).setOrigin(0.5);
 
-      const keg = this.groundedKeg || this.lastKeg;
-      const D = CONFIG.DOOR;
-      const exitX = D.x + 60;
+    const container = this.add.container(G.worldWidth + 300, cupY, [luchi, cup, label]).setDepth(3);
 
-      this.player.body.enable = false;
-      this.player.setVelocity(0, 0);
+    // Кубок (depth 3) должен быть под игроком: поднимаем игрока чуть
+    // выше, чтобы он рендерился спереди во время церемонии победы.
+    this.player.setDepth(4);
 
-      this.tweens.add({
-        targets: this.door,
-        y: this.door.y - 90,
-        duration: 600,
-        ease: 'Sine.easeInOut'
-      });
+    this.tweens.add({
+      targets: luchi,
+      angle: 360,
+      duration: 5000,
+      repeat: -1
+    });
 
-      if (keg) {
-        this.tweens.add({
-          targets: keg,
-          x: exitX,
-          duration: 1600,
-          ease: 'Sine.easeInOut'
-        });
+    this.tweens.add({
+      targets: container,
+      x: cupCenterX,
+      duration: 1800,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  checkFinishReached() {
+    if (this.playerState !== 'alive') return;
+    const F = CONFIG.FINISH;
+    const finishLeft = CONFIG.GAME.worldWidth - F.width;
+    const playerBottom = this.player.y + this.playerBodyBottom;
+    const onFinish = this.player.x > finishLeft && Math.abs(playerBottom - F.topY) < 15;
+
+    if (!this.finishCupShown && onFinish) {
+      this.finishCupShown = true;
+      this.timerStarted = false;
+      this.showCup();
+      if (CONFIG.GAME.level === 1) {
+        this.sound.play('people');
+      } else if (CONFIG.GAME.level === 2) {
+        this.sound.play('fanfary');
       }
-
-      this.tweens.add({
-        targets: this.player,
-        x: exitX,
-        duration: 1600,
-        ease: 'Sine.easeInOut',
-        onComplete: () => {
-          this.scene.start('Victory', { points: this.points });
+      this.time.delayedCall(2000, () => {
+        if (this.playerState === 'alive') {
+          this.showLevelSuccess();
         }
       });
+    }
+  }
+
+  showLevelSuccess() {
+    this.levelSuccessShown = true;
+    const panel = CONFIG.GAME.level === 2 ? this.victoryScreen : this.levelSuccessPanel;
+    panel.setScale(0.3).setAlpha(0).setVisible(true);
+    this.tweens.add({
+      targets: panel,
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 1,
+      duration: 400,
+      ease: 'Back.easeOut'
     });
+  }
+
+  advanceToNextLevel() {
+    const nextLevel = CONFIG.GAME.level + 1;
+    if (nextLevel > 2) {
+      this.scene.start('Menu');
+    } else {
+      if (nextLevel > CONFIG.GAME.unlockedLevel) {
+        CONFIG.GAME.unlockedLevel = nextLevel;
+      }
+      CONFIG.GAME.level = nextLevel;
+      this.scene.start('Game');
+    }
+  }
+
+  handleVictoryInput() {
+    if (!this.finishCupShown) return;
+    if (!this.levelSuccessShown) return;
+    if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.advanceToNextLevel();
+    }
   }
 
   handleKegContact(player, keg) {
@@ -452,12 +646,10 @@ makePlayer() {
         this.groundedKeg = keg;
         this.lastKeg = keg;
         keg.grantGrace(CONFIG.TIP.graceAfterLanding);
+        this.sound.play('keg');
         if (!keg.scored) {
           keg.scored = true;
           this.addPoint();
-        }
-        if (keg.isExitKeg) {
-          this.startVictorySequence();
         }
       } else {
         this.tipKegUnder(player, keg, dx);
@@ -477,13 +669,11 @@ makePlayer() {
     this.lastKeg = keg;
     this.fallenFromKeg = keg;
     keg.tipKeg(dx >= 0 ? 1 : -1);
-    SFX.tip();
   }
 
   addPoint() {
     this.points++;
     this.updateHUD();
-    SFX.point();
   }
 
   updateHUD() {
@@ -494,18 +684,14 @@ makePlayer() {
   }
 
   updateTimerText() {
-    const remaining = Math.max(0, this.timerEnd - this.time.now);
-    const secs = Math.ceil(remaining / 1000);
+    if (!this.timerStarted) return;
+    const elapsed = this.time.now - this.timerStart;
+    const secs = Math.floor(elapsed / 1000);
     const mm = Math.floor(secs / 60);
     const ss = secs % 60;
     this.timerText.setText(
       String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0')
     );
-    if (remaining <= 0 && !this.timeUp) {
-      this.timeUp = true;
-      this.timeUpText.setVisible(true);
-      this.hideRescuePrompt();
-    }
   }
 
   handleInput(delta) {
@@ -526,12 +712,26 @@ makePlayer() {
       this.jumpBufferTimer = Math.max(0, this.jumpBufferTimer - delta);
     }
 
+    if (this.cursors.left.isDown || this.cursors.right.isDown || this.cursors.up.isDown) {
+      if (!this.timerStarted) {
+        this.timerStarted = true;
+        this.timerStart = this.time.now;
+      }
+    }
+
     if (this.cursors.left.isDown) {
       p.setVelocityX(-P.speed);
       p.setFlipX(true);
     } else if (this.cursors.right.isDown) {
       p.setVelocityX(P.speed);
       p.setFlipX(false);
+    } else if (onGround && this.groundedKeg && this.groundedKeg.body && this.levelCfg.drifting) {
+      this.lastDriftVelocity = this.groundedKeg.body.velocity.x;
+      p.setVelocityX(this.lastDriftVelocity);
+    } else if (onGround) {
+      p.setVelocityX(0);
+    } else if (this.levelCfg.drifting) {
+      p.setVelocityX(this.lastDriftVelocity);
     } else {
       p.setVelocityX(0);
     }
@@ -539,17 +739,74 @@ makePlayer() {
     if ((onGround || this.coyoteTimer > 0) && this.jumpBufferTimer > 0) {
       p.setVelocityY(P.jumpVelocity);
       this.jumpBufferTimer = 0;
-      SFX.jump();
+      this.groundedKeg = null;
+      this.sound.play('oh');
+    }
+
+    this.updatePlayerAnim(onGround);
+
+    // On the finish platform, confine the player horizontally so they can
+    // freely walk with arrow keys but cannot fall off either edge.
+    const F = CONFIG.FINISH;
+    const finishLeft = CONFIG.GAME.worldWidth - F.width;
+    const finishRight = CONFIG.GAME.worldWidth;
+    if (p.body.blocked.down || p.body.touching.down) {
+      const bottom = p.y + this.playerBodyBottom;
+      if (p.x > finishLeft && Math.abs(bottom - F.topY) < 15) {
+        const halfW = p.body.width * 0.5;
+        const minX = finishLeft + halfW;
+        const maxX = finishRight - halfW;
+        if (p.x < minX) {
+          p.x = minX;
+          p.setVelocityX(Math.max(0, p.body.velocity.x));
+        } else if (p.x > maxX) {
+          p.x = maxX;
+          p.setVelocityX(Math.min(0, p.body.velocity.x));
+        }
+      }
+    }
+  }
+
+  updatePlayerAnim(onGround) {
+    if (!this.textures.exists('playerKon')) return;
+    const p = this.player;
+    const velY = p.body.velocity.y;
+
+    if (!onGround) {
+      if (velY < -50) {
+        if (!p.anims.isPlaying || p.anims.currentAnim.key !== 'playerJump') {
+          p.play('playerJump');
+        }
+      } else {
+        if (!p.anims.isPlaying || p.anims.currentAnim.key !== 'playerFall') {
+          p.play('playerFall');
+        }
+      }
+    } else if (this.cursors.left.isDown || this.cursors.right.isDown) {
+      if (!p.anims.isPlaying || p.anims.currentAnim.key !== 'playerRun') {
+        p.play('playerRun');
+      }
+    } else {
+      if (!p.anims.isPlaying || p.anims.currentAnim.key !== 'playerIdle') {
+        p.play('playerIdle');
+      }
     }
   }
 
   update(time, delta) {
     this.handleInput(delta);
-    this.updateKegs(time);
+    if (this.levelCfg.drifting) {
+      this.updateDriftingKegs(time);
+    }
+    if (!this.finishCupShown && !this.levelCfg.drifting) {
+      this.updateKegs(time);
+    }
     this.checkFall();
     this.updateCamera();
     this.handleRescuePrompt();
     this.updateTimerText();
+    this.checkFinishReached();
+    this.handleVictoryInput();
   }
 
   updateKegs(time) {
@@ -571,12 +828,15 @@ makePlayer() {
     this.player.setVelocity(0, 0);
     this.player.body.setAllowGravity(false);
     this.updateHUD();
-    this.showRescuePrompt();
+    if (this.falls <= 3) {
+      this.showRescuePrompt();
+    }
 
     this.splashEmitter.x = this.player.x;
     this.splashEmitter.y = this.beerY;
     this.splashEmitter.explode(36);
-    SFX.splash();
+    this.sound.play('fall');
+    this.sound.play('cry');
 
     this.tweens.add({
       targets: this.player,
@@ -587,14 +847,10 @@ makePlayer() {
   }
 
   showRescuePrompt() {
-    const msg = CONFIG.FALL_MESSAGES[this.fallMessageIndex % CONFIG.FALL_MESSAGES.length];
-    this.fallMessageIndex++;
-
     this.rescueBanner.setScale(0.3).setAlpha(0).setVisible(true);
-    this.rescueMessage.setScale(0.3).setAlpha(0).setVisible(true);
 
     this.tweens.add({
-      targets: [this.rescueBanner, this.rescueMessage],
+      targets: this.rescueBanner,
       scaleX: 1,
       scaleY: 1,
       alpha: 1,
@@ -602,13 +858,26 @@ makePlayer() {
       ease: 'Back.easeOut'
     });
 
-    this.rescueMessage.setText(msg);
+    this.time.delayedCall(3000, () => {
+      if (!this.rescueBanner.visible) return;
+      this.tweens.add({
+        targets: this.rescueBanner,
+        scaleX: 0.3,
+        scaleY: 0.3,
+        alpha: 0,
+        duration: 300,
+        ease: 'Back.easeIn',
+        onComplete: () => {
+          this.rescueBanner.setVisible(false);
+        }
+      });
+    });
   }
 
   handleRescuePrompt() {
-    if (this.playerState !== 'fallen' || !this.rescueBanner.visible) return;
+    if (this.playerState !== 'fallen') return;
 
-    const canRescue = this.points >= CONFIG.RESCUE.cost && this.fallenFromKeg;
+    const canRescue = this.points >= CONFIG.RESCUE.cost && (this.fallenFromKeg || this.levelCfg.drifting);
     if (canRescue && Phaser.Input.Keyboard.JustDown(this.rescueKey)) {
       this.doRescue();
     } else if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
@@ -618,7 +887,6 @@ makePlayer() {
 
   hideRescuePrompt() {
     this.rescueBanner.setVisible(false);
-    this.rescueMessage.setVisible(false);
   }
 
   doRescue() {
@@ -627,7 +895,7 @@ makePlayer() {
     this.hideRescuePrompt();
     this.tweens.killTweensOf(this.player);
 
-    const keg = this.fallenFromKeg;
+    const keg = this.findNearestKeg();
     this.fallenFromKeg = null;
     this.groundedKeg = null;
 
@@ -644,25 +912,60 @@ makePlayer() {
     const targetY = keg.baseY - K.height / 2 - this.playerBodyBottom;
 
     this.player.body.enable = false;
-    this.tweens.add({
-      targets: this.player,
-      x: keg.x,
-      y: targetY,
-      alpha: 1,
-      duration: CONFIG.RESCUE.riseDuration,
-      ease: 'Sine.easeOut',
-      onComplete: () => {
-        this.player.body.enable = true;
-        this.player.body.setAllowGravity(true);
-        this.player.setVelocity(0, 0);
-        this.playerState = 'alive';
-        this.groundedKeg = keg;
-        this.lastKeg = keg;
-        if (keg.isExitKeg) {
-          this.startVictorySequence();
+
+    if (this.levelCfg.drifting) {
+      this.tweens.add({
+        targets: this.player,
+        y: targetY,
+        alpha: 1,
+        duration: CONFIG.RESCUE.riseDuration,
+        ease: 'Sine.easeOut',
+        onUpdate: () => {
+          this.player.x = keg.x;
+        },
+        onComplete: () => {
+          this.player.x = keg.x;
+          this.player.y = targetY;
+          this.player.body.enable = true;
+          this.player.body.setAllowGravity(true);
+          this.player.setVelocity(keg.body.velocity.x, keg.body.velocity.y);
+          this.playerState = 'alive';
+          this.groundedKeg = keg;
+          this.lastKeg = keg;
         }
+      });
+    } else {
+      this.tweens.add({
+        targets: this.player,
+        x: keg.x,
+        y: targetY,
+        alpha: 1,
+        duration: CONFIG.RESCUE.riseDuration,
+        ease: 'Sine.easeOut',
+        onComplete: () => {
+          this.player.body.enable = true;
+          this.player.body.setAllowGravity(true);
+          this.player.setVelocity(0, 0);
+          this.playerState = 'alive';
+          this.groundedKeg = keg;
+          this.lastKeg = keg;
+        }
+      });
+    }
+  }
+
+  findNearestKeg() {
+    let nearest = null;
+    let minDist = Infinity;
+    this.kegList.forEach((keg) => {
+      if (keg.state !== 'floating') return;
+      const dist = Math.abs(keg.x - this.player.x);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = keg;
       }
     });
+    return nearest;
   }
 
   returnToStart() {

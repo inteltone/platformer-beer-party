@@ -16,7 +16,7 @@ const config = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
     max: { width: 1280, height: 720 }
   },
-  scene: [BootScene, MenuScene, GameScene, VictoryScene]
+  scene: [BootScene, LoadingScene, MenuScene, GameScene, VictoryScene]
 };
 
 window.addEventListener('load', () => {

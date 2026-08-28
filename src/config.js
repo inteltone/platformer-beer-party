@@ -3,16 +3,15 @@ const CONFIG = {
     width: 1280,
     height: 720,
     worldWidth: 4000,
-    backgroundColor: '#828282',
+    backgroundColor: '#565656',
     gravityY: 1800,
-    level: 1
+    level: 1,
+    unlockedLevel: 1
   },
 
   LEVELS: [
-    { equalGaps: true,  gapGrowth: 0,  rockKegs: false, safeZoneRatio: 0.5, time: 60, variedProtrusion: false },
-    { equalGaps: false, gapGrowth: 0,  rockKegs: false, safeZoneRatio: 0.5, time: 50, variedProtrusion: false },
-    { equalGaps: false, gapGrowth: 20, rockKegs: true,  safeZoneRatio: 0.5, time: 40, variedProtrusion: true },
-    { equalGaps: false, gapGrowth: 20, rockKegs: true,  safeZoneRatio: 0.4, time: 30, variedProtrusion: true }
+    { equalGaps: false, gapGrowth: 20, rockKegs: true, safeZoneRatio: 0.5, time: 0, variedProtrusion: true },
+    { drifting: true, safeZoneRatio: 0.5, time: 0, variedProtrusion: true }
   ],
 
   FALL_MESSAGES: [
@@ -58,8 +57,8 @@ const CONFIG = {
   KEG: {
     width: 96,
     height: 151,
-    topOffsetFromSurface: 15,
-    topOffsetMax: 55,
+    topOffsetFromSurface: 20,
+    topOffsetMax: 40,
     safeZoneRatio: 0.5,
     gradientStops: [
       { p: 0.0037, c: 0x5b8b65 },
@@ -86,6 +85,32 @@ const CONFIG = {
     color: 0x4a3728,
     frameColor: 0x6b5340,
     signColor: 0x3fbf6e
+  },
+
+  FINISH: {
+    width: 410,
+    height: 207,
+    topY: 513,
+    color: 0xcdcdcd
+  },
+
+  DRIFT: {
+    speed: 42,
+    gapMin: -10,
+    gapMax: 170,
+    bobAmpMin: 3,
+    bobAmpMax: 10,
+    bobFreqMin: 0.5,
+    bobFreqMax: 2,
+    swayAmpMin: 3,
+    swayAmpMax: 12,
+    swayFreqMin: 0.3,
+    swayFreqMax: 1.5,
+    tiltAmpMin: 0.02,
+    tiltAmpMax: 0.08,
+    tiltFreqMin: 0.4,
+    tiltFreqMax: 1.8,
+    kegCount: 40
   },
 
   JUMP: {
