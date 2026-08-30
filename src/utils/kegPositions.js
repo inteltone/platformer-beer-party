@@ -6,12 +6,12 @@
  * `randomBetween` — callers (and tests) can inject a custom RNG.
  *
  * @param {object} levelCfg  — the level configuration entry from CONFIG.LEVELS
- * @param {function} [randomBetween] — (min, max) => int, defaults to Phaser.Math.Between
+ * @param {function} [randomBetween] — (min, max) => int, defaults to Math.random
  * @returns {number[]} array of x-coordinates for keg centres
  */
 import CONFIG from '../config.js';
 
-export function generateKegXPositions(levelCfg, randomBetween = PhaserMathBetween) {
+export function generateKegXPositions(levelCfg, randomBetween = defaultRandomBetween) {
   const Gen = CONFIG.GEN;
   const K = CONFIG.KEG;
   const G = CONFIG.GAME;
@@ -42,7 +42,7 @@ export function generateKegXPositions(levelCfg, randomBetween = PhaserMathBetwee
   return positions;
 }
 
-/** Default RNG — delegates to Phaser's Math.Between. */
-function PhaserMathBetween(min, max) {
-  return Phaser.Math.Between(min, max);
+/** Default RNG — pure JS, no Phaser dependency. */
+function defaultRandomBetween(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }

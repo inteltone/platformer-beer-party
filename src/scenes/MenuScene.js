@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import CONFIG from '../config.js';
 import GameState from '../gameState.js';
 import { SFX } from '../objects/Sfx.js';

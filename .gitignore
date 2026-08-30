@@ -1,7 +1,6 @@
 node_modules/
 settings.json
-dist/
-dist.zip
+dist*
 .DS_Store
 mug-sprite/
 assets/sounds/muz-track.mp3

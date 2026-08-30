@@ -1,4 +1,6 @@
+import Phaser from 'phaser';
 import { createMugAnimation } from '../utils/animations.js';
+import { IMAGE_ASSETS, SPRITESHEET_ASSETS } from '../utils/assetManifest.js';
 
 /**
  * First scene — loads only the lightweight loading-screen assets
@@ -10,8 +12,9 @@ export default class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('screenLoading', 'assets/screen-loading.png');
-    this.load.spritesheet('mug', 'assets/mug-spritesheet.png', { frameWidth: 285, frameHeight: 440 });
+    this.load.image('screenLoading', IMAGE_ASSETS.screenLoading);
+    const mug = SPRITESHEET_ASSETS.mug;
+    this.load.spritesheet('mug', mug.url, { frameWidth: mug.frameWidth, frameHeight: mug.frameHeight });
   }
 
   create() {

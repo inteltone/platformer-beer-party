@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import CONFIG from '../config.js';
 import GameState from '../gameState.js';
 import Keg, { DriftingKeg } from '../objects/Keg.js';
@@ -403,14 +404,15 @@ export default class GameScene extends Phaser.Scene {
     const floating = this.kegList.filter((k) => k.state === KegState.FLOATING).sort((a, b) => a.x - b.x);
     const rightMost = floating.length ? floating[floating.length - 1] : null;
 
-    // Recycle kegs that drifted off the left edge OR sank into the dock,
+    // Recycle kegs that drifted off the left edge OR fully sank (TIPPED),
     // re-injecting them just behind the rightmost floating keg. This keeps
     // the train contiguous and prevents the active-keg pool from shrinking
-    // as kegs sink.
+    // as kegs sink. TIPPING is NOT sunk: on drifting levels DriftingKeg.tipKeg
+    // wobbles and recovers back to FLOATING, so such kegs must stay in place.
     let extended = false;
     this.kegList.forEach((keg) => {
       const offLeft = keg.state === KegState.FLOATING && keg.x < -K.width;
-      const sunk = keg.state === KegState.TIPPING || keg.state === KegState.TIPPED;
+      const sunk = keg.state === KegState.TIPPED;
       if (!offLeft && !sunk) return;
 
       const baseX = rightMost
@@ -435,9 +437,11 @@ export default class GameScene extends Phaser.Scene {
     const nowFloating = this.kegList.filter((k) => k.state === KegState.FLOATING).sort((a, b) => a.x - b.x);
     const nearFinish = nowFloating.some((k) => k.x > this.finishLeft - K.width * 2);
     if (!nearFinish && nowFloating.length >= 2) {
-      const leftMost = nowFloating[0];
+      // Never yank the keg the player is currently standing on — being
+      // teleported from under their feet reads as an unfair second fall.
+      const leftMost = nowFloating.find((k) => k !== this.groundedKeg);
       const right = nowFloating[nowFloating.length - 1];
-      if (leftMost !== right) {
+      if (leftMost && leftMost !== right) {
         const topOffset = Phaser.Math.Between(K.topOffsetFromSurface, K.topOffsetMax);
         leftMost.baseY = (this.beerY - topOffset) + K.height / 2;
         leftMost.recycle();
@@ -657,6 +661,14 @@ export default class GameScene extends Phaser.Scene {
   }
 
   tipKegUnder(_player, keg, dx) {
+    // Brushing the edge of a NEIGHBOR keg while standing on another one
+    // must not steal the player's footing: clearing groundedKeg here made
+    // the keg actually under the player slide away (velocity match stops)
+    // and drop them into the beer right after a rescue.
+    if (this.groundedKeg && this.groundedKeg !== keg) {
+      keg.tipKeg(dx >= 0 ? 1 : -1);
+      return;
+    }
     this.groundedKeg = null;
     this.lastKeg = keg;
     this.fallenFromKeg = keg;
@@ -821,6 +833,10 @@ export default class GameScene extends Phaser.Scene {
           this.playerState = PlayerState.ALIVE;
           this.groundedKeg = keg;
           this.lastKeg = keg;
+          // Grace must start at LANDING, not at rescue start: the rise
+          // already consumed most of the 1s granted by restoreForRescue(),
+          // leaving ~100ms — any perturbation then tipped the keg again.
+          keg.grantGrace(CONFIG.RESCUE.graceDuration);
         },
       });
     } else {
@@ -838,6 +854,7 @@ export default class GameScene extends Phaser.Scene {
           this.playerState = PlayerState.ALIVE;
           this.groundedKeg = keg;
           this.lastKeg = keg;
+          keg.grantGrace(CONFIG.RESCUE.graceDuration);
         },
       });
     }

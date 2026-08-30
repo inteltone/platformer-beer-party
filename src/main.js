@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import CONFIG from './config.js';
 import BootScene from './scenes/BootScene.js';
 import LoadingScene from './scenes/LoadingScene.js';

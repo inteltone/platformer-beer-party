@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import CONFIG from '../config.js';
 import { KegState } from '../enums.js';
 

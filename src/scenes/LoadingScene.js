@@ -1,7 +1,9 @@
+import Phaser from 'phaser';
 import CONFIG from '../config.js';
 import { SFX } from '../objects/Sfx.js';
 import { createPlayerAnimations } from '../utils/animations.js';
 import { createPlaceholderTextures } from '../utils/textures.js';
+import { IMAGE_ASSETS, SPRITESHEET_ASSETS, AUDIO_ASSETS } from '../utils/assetManifest.js';
 import { SoundKey } from '../enums.js';
 
 /**
@@ -76,41 +78,24 @@ export default class LoadingScene extends Phaser.Scene {
   }
 
   loadImageAssets() {
-    this.load.image('keg', 'assets/keg.png');
-    this.load.image('player', 'assets/player.png');
-    this.load.image('brick', 'assets/texture-brick.png');
-    this.load.image('bgtexture', 'assets/texture-bg.png');
-    this.load.image('truby', 'assets/truby.png');
-    this.load.image('nameplate', 'assets/nameplate.png');
-    this.load.image('header', 'assets/header.png');
-    this.load.image('plashka', 'assets/plashka.png');
-    this.load.image('plashkaLevelSuccess', 'assets/plashka-level-success.png');
-    this.load.image('screenVictory', 'assets/screen-victory.png');
-    this.load.image('screenStart', 'assets/screen-start.png');
-    this.load.image('btnStart', 'assets/btn-start.png');
-    this.load.image('btnLevelOpen', 'assets/btn-level-open.png');
-    this.load.image('btnLevelClosed', 'assets/btn-level-closed.png');
-    this.load.image('btnHome', 'assets/btn-home.png');
-    this.load.image('cup', 'assets/cup.png');
-    this.load.image('cupLuchi', 'assets/cup-luchi.png');
-    this.load.image('lamp', 'assets/lamp.png');
+    for (const [key, url] of Object.entries(IMAGE_ASSETS)) {
+      this.load.image(key, url);
+    }
   }
 
   loadPlayerSpritesheet() {
     try {
-      this.load.spritesheet('playerKon', 'assets/player-kon-sprite.png', { frameWidth: 256, frameHeight: 256 });
+      const sheet = SPRITESHEET_ASSETS.playerKon;
+      this.load.spritesheet('playerKon', sheet.url, { frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight });
     } catch (err) {
       console.warn('playerKon spritesheet not available, will use placeholder:', err);
     }
   }
 
   loadAudioAssets() {
-    this.load.audio(SoundKey.PEOPLE, 'assets/sounds/people.mp3');
-    this.load.audio(SoundKey.KEG, 'assets/sounds/keg.mp3');
-    this.load.audio(SoundKey.FANFARY, 'assets/sounds/fanfary.mp3');
-    this.load.audio(SoundKey.FALL, 'assets/sounds/fall.mp3');
-    this.load.audio(SoundKey.OH, 'assets/sounds/oh.mp3');
-    this.load.audio(SoundKey.CRY, 'assets/sounds/cry.mp3');
+    for (const [key, url] of Object.entries(AUDIO_ASSETS)) {
+      this.load.audio(key, url);
+    }
   }
 
   finishLoading(container) {
