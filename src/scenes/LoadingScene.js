@@ -1,4 +1,16 @@
-class LoadingScene extends Phaser.Scene {
+import CONFIG from '../config.js';
+import { SFX } from '../objects/Sfx.js';
+import { createPlayerAnimations } from '../utils/animations.js';
+import { createPlaceholderTextures } from '../utils/textures.js';
+import { SoundKey } from '../enums.js';
+
+/**
+ * Loading screen — loads all asset files then transitions to the menu.
+ *
+ * Provides a mug animation while assets load, and creates placeholder
+ * fallback textures + player sprite-sheet animations on complete.
+ */
+export default class LoadingScene extends Phaser.Scene {
   constructor() {
     super('Loading');
   }
@@ -6,6 +18,42 @@ class LoadingScene extends Phaser.Scene {
   create() {
     const { width, height } = CONFIG.GAME;
 
+    this._bindUnlock();
+
+    const container = this.add.container(width / 2, height / 2);
+
+    const bg = this.add.image(0, 0, 'screenLoading');
+
+    let mug;
+    try {
+      if (this.anims.exists('mugAnim')) {
+        mug = this.add.sprite(0, 0, 'mug').setOrigin(0.502, 0.518);
+        mug.play('mugAnim');
+      } else {
+        mug = this.add.sprite(0, 0, 'mug').setOrigin(0.502, 0.518);
+      }
+    } catch (err) {
+      console.warn('Failed to create mug sprite, continuing without it:', err);
+    }
+
+    if (mug) container.add([bg, mug]);
+    else container.add([bg]);
+
+    this.loadImageAssets();
+    this.loadAudioAssets();
+    this.loadPlayerSpritesheet();
+
+    this.load.once('complete', () => {
+      createPlaceholderTextures(this);
+      createPlayerAnimations(this);
+      this._addSounds();
+      this.finishLoading(container);
+    });
+
+    this.load.start();
+  }
+
+  _bindUnlock() {
     const unlock = () => {
       SFX.unlock();
       this.sound.unlock();
@@ -17,32 +65,14 @@ class LoadingScene extends Phaser.Scene {
     }
     this.input.once('pointerdown', unlock);
     this.input.keyboard.once('keydown', unlock);
+  }
 
-    const container = this.add.container(width / 2, height / 2);
-
-    const bg = this.add.image(0, 0, 'screenLoading');
-    const mug = this.add.sprite(0, 0, 'mug').setOrigin(0.502, 0.518);
-    if (this.anims.exists('mugAnim')) {
-      mug.play('mugAnim');
-    }
-    container.add([bg, mug]);
-
-    this.loadImageAssets();
-    this.loadAudioAssets();
-    this.loadPlayerSpritesheet();
-
-    this.load.once('complete', () => {
-      createPlaceholderTextures(this);
-      createPlayerAnimations(this);
-      ['keg', 'people', 'fanfary', 'fall', 'oh', 'cry'].forEach((key) => {
-        if (this.cache.audio.exists(key)) {
-          this.sound.add(key);
-        }
-      });
-      this.finishLoading(container);
+  _addSounds() {
+    [SoundKey.KEG, SoundKey.PEOPLE, SoundKey.FANFARY, SoundKey.FALL, SoundKey.OH, SoundKey.CRY].forEach((key) => {
+      if (this.cache.audio.exists(key)) {
+        this.sound.add(key);
+      }
     });
-
-    this.load.start();
   }
 
   loadImageAssets() {
@@ -67,16 +97,20 @@ class LoadingScene extends Phaser.Scene {
   }
 
   loadPlayerSpritesheet() {
-    this.load.spritesheet('playerKon', 'assets/player-kon-sprite.png', { frameWidth: 256, frameHeight: 256 });
+    try {
+      this.load.spritesheet('playerKon', 'assets/player-kon-sprite.png', { frameWidth: 256, frameHeight: 256 });
+    } catch (err) {
+      console.warn('playerKon spritesheet not available, will use placeholder:', err);
+    }
   }
 
   loadAudioAssets() {
-    this.load.audio('people', 'assets/sounds/people.mp3');
-    this.load.audio('keg', 'assets/sounds/keg.mp3');
-    this.load.audio('fanfary', 'assets/sounds/fanfary.mp3');
-    this.load.audio('fall', 'assets/sounds/fall.mp3');
-    this.load.audio('oh', 'assets/sounds/oh.mp3');
-    this.load.audio('cry', 'assets/sounds/cry.mp3');
+    this.load.audio(SoundKey.PEOPLE, 'assets/sounds/people.mp3');
+    this.load.audio(SoundKey.KEG, 'assets/sounds/keg.mp3');
+    this.load.audio(SoundKey.FANFARY, 'assets/sounds/fanfary.mp3');
+    this.load.audio(SoundKey.FALL, 'assets/sounds/fall.mp3');
+    this.load.audio(SoundKey.OH, 'assets/sounds/oh.mp3');
+    this.load.audio(SoundKey.CRY, 'assets/sounds/cry.mp3');
   }
 
   finishLoading(container) {
@@ -88,7 +122,7 @@ class LoadingScene extends Phaser.Scene {
         ease: 'Sine.easeInOut',
         onComplete: () => {
           this.scene.start('Menu');
-        }
+        },
       });
     });
   }
